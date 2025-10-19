@@ -1,0 +1,128 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ==========================================
+    // دوال مساعدة للتحقق من الأمان
+    // ==========================================
+
+    // التحقق من أن المستخدم مسجل دخول
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // التحقق من أن المستخدم هو صاحب البيانات
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // التحقق من أن المستخدم مسؤول (Admin) عن طريق البريد الإلكتروني
+    function isAdmin() {
+      return isAuthenticated() &&
+             exists(/databases/$(database)/documents/admin_allowed_emails/$(request.auth.token.email)) &&
+             get(/databases/$(database)/documents/admin_allowed_emails/$(request.auth.token.email)).data.active == true;
+    }
+
+    // ==========================================
+    // قواعد KYC Submissions
+    // ==========================================
+
+    match /kyc_submissions/{submissionId} {
+      // القراءة: المستخدم يقرأ طلباته فقط، أو المسؤول يقرأ كل شيء
+      allow read: if isOwner(resource.data.user_id) || isAdmin();
+
+      // الإنشاء: المستخدم ينشئ طلبه الخاص فقط ويجب أن يكون الحالة pending
+      allow create: if isAuthenticated() &&
+                       request.auth.uid == request.resource.data.user_id &&
+                       request.resource.data.status == 'pending';
+
+      // التحديث: المستخدم يحدث طلبه إذا كان pending، أو المسؤول يحدث أي طلب
+      allow update: if (isOwner(resource.data.user_id) && resource.data.status == 'pending') ||
+                       isAdmin();
+
+      // الحذف: ممنوع للجميع (حتى المسؤولين) - للحفاظ على سجل التدقيق
+      allow delete: if false;
+    }
+
+    // ==========================================
+    // قواعد Audit Log
+    // ==========================================
+
+    match /kyc_audit_log/{logId} {
+      // القراءة: المسؤولون فقط يمكنهم قراءة سجل التدقيق
+      allow read: if isAdmin();
+
+      // الإنشاء: أي مستخدم مصادق (النظام ينشئ السجلات)
+      allow create: if isAuthenticated();
+
+      // التحديث والحذف: ممنوع تماماً - سجل التدقيق لا يُعدل أبداً
+      allow update, delete: if false;
+    }
+
+    // ==========================================
+    // قواعد الإشعارات
+    // ==========================================
+
+    match /kyc_notifications/{notificationId} {
+      // القراءة: المستخدم يقرأ إشعاراته فقط
+      allow read: if isOwner(resource.data.user_id);
+
+      // الإنشاء: النظام ينشئ الإشعارات (أي مستخدم مصادق)
+      allow create: if isAuthenticated();
+
+      // التحديث: المستخدم يحدث إشعاراته (مثل وضع علامة مقروء)
+      allow update: if isOwner(resource.data.user_id);
+
+      // الحذف: المستخدم يحذف إشعاراته
+      allow delete: if isOwner(resource.data.user_id);
+    }
+
+    // ==========================================
+    // قواعد مستخدمي الإدارة
+    // ==========================================
+
+    match /kyc_admin_users/{adminId} {
+      // القراءة: المسؤولون فقط
+      allow read: if isAdmin();
+
+      // الإنشاء والتحديث والحذف: المسؤولون فقط
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ==========================================
+    // قواعد قائمة البريد الإلكتروني المسموح للمسؤولين
+    // ==========================================
+
+    match /admin_allowed_emails/{email} {
+      // القراءة: المسؤولون فقط
+      allow read: if isAdmin();
+
+      // الإنشاء والتحديث والحذف: المسؤولون فقط
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ==========================================
+    // قواعد سجل الوصول الإداري
+    // ==========================================
+
+    match /admin_access_audit_log/{logId} {
+      // القراءة: المسؤولون فقط
+      allow read: if isAdmin();
+
+      // الإنشاء: أي مستخدم مصادق (للتسجيل التلقائي)
+      allow create: if isAuthenticated();
+
+      // التحديث والحذف: ممنوع (سجل التدقيق لا يُعدل)
+      allow update, delete: if false;
+    }
+
+    // ==========================================
+    // منع الوصول لأي مسارات أخرى
+    // ==========================================
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
