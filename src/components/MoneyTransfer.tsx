@@ -436,6 +436,9 @@ export const MoneyTransfer: React.FC = () => {
         if (recipientType === 'saved' && selectedRecipient) {
           await updateLastUsed(selectedRecipient);
         }
+
+        setIsProcessing(false);
+        setOperationComplete(true);
       } else {
         let recipient = withdrawalData.recipientName || 'Cash Withdrawal';
         let agentName = '';
