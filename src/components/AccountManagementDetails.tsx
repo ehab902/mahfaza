@@ -485,6 +485,57 @@ export const AccountManagementDetails: React.FC<AccountManagementDetailsProps> =
                     <option value="MA">{t('country.morocco')}</option>
                     <option value="LY">{t('country.libya')}</option>
                   </optgroup>
+                  <optgroup label="دول أخرى">
+                    <option value="TR">تركيا</option>
+                  </optgroup>
+                  <optgroup label="الدول الأوروبية">
+                    <option value="AL">ألبانيا</option>
+                    <option value="AD">أندورا</option>
+                    <option value="AT">النمسا</option>
+                    <option value="BY">بيلاروسيا</option>
+                    <option value="BE">بلجيكا</option>
+                    <option value="BA">البوسنة والهرسك</option>
+                    <option value="BG">بلغاريا</option>
+                    <option value="HR">كرواتيا</option>
+                    <option value="CY">قبرص</option>
+                    <option value="CZ">التشيك</option>
+                    <option value="DK">الدنمارك</option>
+                    <option value="EE">إستونيا</option>
+                    <option value="FI">فنلندا</option>
+                    <option value="FR">فرنسا</option>
+                    <option value="DE">ألمانيا</option>
+                    <option value="GR">اليونان</option>
+                    <option value="HU">المجر</option>
+                    <option value="IS">أيسلندا</option>
+                    <option value="IE">أيرلندا</option>
+                    <option value="IT">إيطاليا</option>
+                    <option value="XK">كوسوفو</option>
+                    <option value="LV">لاتفيا</option>
+                    <option value="LI">ليختنشتاين</option>
+                    <option value="LT">ليتوانيا</option>
+                    <option value="LU">لوكسمبورغ</option>
+                    <option value="MT">مالطا</option>
+                    <option value="MD">مولدوفا</option>
+                    <option value="MC">موناكو</option>
+                    <option value="ME">الجبل الأسود</option>
+                    <option value="NL">هولندا</option>
+                    <option value="MK">مقدونيا الشمالية</option>
+                    <option value="NO">النرويج</option>
+                    <option value="PL">بولندا</option>
+                    <option value="PT">البرتغال</option>
+                    <option value="RO">رومانيا</option>
+                    <option value="RU">روسيا</option>
+                    <option value="SM">سان مارينو</option>
+                    <option value="RS">صربيا</option>
+                    <option value="SK">سلوفاكيا</option>
+                    <option value="SI">سلوفينيا</option>
+                    <option value="ES">إسبانيا</option>
+                    <option value="SE">السويد</option>
+                    <option value="CH">سويسرا</option>
+                    <option value="UA">أوكرانيا</option>
+                    <option value="GB">المملكة المتحدة</option>
+                    <option value="VA">الفاتيكان</option>
+                  </optgroup>
                 </select>
                 <p className="mt-1 text-xs text-light-text-secondary dark:text-dark-text-secondary">{t('accountMgmt.countryCannotBeChanged')}</p>
               </div>
