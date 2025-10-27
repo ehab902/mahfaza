@@ -179,7 +179,7 @@ function App() {
         <ToastProvider>
           {!isAuthenticated ? (
             <AuthPage />
-          ) : verificationStep === 'email' && user ? (
+          ) : /* verificationStep === 'email' && user ? (
             <EmailVerificationPage user={user} onVerified={handleEmailVerified} />
           ) : verificationStep === 'phone' && user ? (
             <PhoneVerificationPage
@@ -187,7 +187,7 @@ function App() {
               onVerified={handlePhoneVerified}
               onSkip={handlePhoneSkipped}
             />
-          ) : verificationStep === 'completed' ? (
+          ) : */ verificationStep === 'completed' ? (
             <AppContent
               activeSection={activeSection}
               setActiveSection={setActiveSection}
