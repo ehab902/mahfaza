@@ -105,15 +105,7 @@ export function ManualKYCReviewModal({
       setError(null);
       setUploading(true);
 
-      // Validate at least one document is selected
-      const hasDocuments = Object.values(documents).some(doc => doc.file !== null);
-      if (!hasDocuments) {
-        setError('يجب رفع واحد على الأقل من المستندات');
-        setUploading(false);
-        return;
-      }
-
-      // Upload documents to Firebase Storage
+      // Upload documents to Firebase Storage (if any are selected)
       const uploadedUrls: Record<string, string | null> = {
         national_id_url: null,
         passport_url: null,
