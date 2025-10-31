@@ -43,6 +43,24 @@ export function ManualKYCReviewModal({
       setError(null);
       setProcessing(true);
 
+      const submissionRef = doc(collection(db, 'kyc_submissions'));
+      await setDoc(submissionRef, {
+        user_id: account.user_id,
+        status: 'approved',
+        admin_notes: notes || null,
+        reviewed_by: adminId,
+        reviewed_at: serverTimestamp(),
+        submission_date: serverTimestamp(),
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp(),
+        manual_submission: true,
+        submission_source: source,
+        submitted_by_admin: adminEmail,
+        national_id_url: null,
+        passport_url: null,
+        selfie_url: null
+      });
+
       const auditRef = doc(collection(db, 'kyc_audit_log'));
       await setDoc(auditRef, {
         user_id: account.user_id,
@@ -50,7 +68,7 @@ export function ManualKYCReviewModal({
         admin_email: adminEmail,
         action: 'manual_verification_approved',
         old_status: null,
-        new_status: 'verified',
+        new_status: 'approved',
         notes: `تم قبول التحقق يدوياً من المصدر: ${source}. ${notes}`,
         ip_address: null,
         created_at: serverTimestamp()
@@ -59,6 +77,7 @@ export function ManualKYCReviewModal({
       const notificationRef = doc(collection(db, 'kyc_notifications'));
       await setDoc(notificationRef, {
         user_id: account.user_id,
+        submission_id: submissionRef.id,
         type: 'approved',
         title: 'تم قبول التحقق من الهوية',
         message: 'تم قبول طلب التحقق من الهوية بنجاح. يمكنك الآن الوصول إلى جميع المميزات.',
