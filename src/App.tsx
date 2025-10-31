@@ -179,15 +179,7 @@ function App() {
         <ToastProvider>
           {!isAuthenticated ? (
             <AuthPage />
-          ) : /* verificationStep === 'email' && user ? (
-            <EmailVerificationPage user={user} onVerified={handleEmailVerified} />
-          ) : verificationStep === 'phone' && user ? (
-            <PhoneVerificationPage
-              user={user}
-              onVerified={handlePhoneVerified}
-              onSkip={handlePhoneSkipped}
-            />
-          ) : */ verificationStep === 'completed' ? (
+          ) : (
             <AppContent
               activeSection={activeSection}
               setActiveSection={setActiveSection}
@@ -197,7 +189,7 @@ function App() {
               showKYCUpload={showKYCUpload}
               setShowKYCUpload={setShowKYCUpload}
             />
-          ) : null}
+          )}
         </ToastProvider>
       </LanguageProvider>
     </ThemeProvider>
