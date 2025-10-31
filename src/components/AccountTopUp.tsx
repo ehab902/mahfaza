@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Wallet, Building2, Users, CreditCard, ArrowRight, CheckCircle, Clock, AlertCircle, Upload, MessageCircle, Copy, Search, MapPin, Phone } from 'lucide-react';
+import { Wallet, Building2, Users, CreditCard, ArrowRight, CheckCircle, Clock, AlertCircle, Upload, MessageCircle, Copy, Search, MapPin, Phone, X } from 'lucide-react';
+import QRCode from 'qrcode';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useBankAccount } from '../hooks/useBankAccount';
 import { useTransactions } from '../hooks/useTransactions';
@@ -60,15 +61,15 @@ const topUpMethods: TopUpMethod[] = [
     status: 'available'
   },
   {
-    id: 'debit-card',
-    name: 'topup.methodDebitCard',
+    id: 'sham-cash',
+    name: 'sham-cash',
     icon: CreditCard,
-    description: 'topup.descDebitCard',
+    description: 'Fast digital transfer via Sham Cash',
     processingTime: 'topup.processingTimeInstant',
-    fees: '2% + 1.5 EUR',
-    minAmount: 25,
-    maxAmount: 10000,
-    status: 'maintenance'
+    fees: '1.5% + 1 EUR',
+    minAmount: 1,
+    maxAmount: 50000,
+    status: 'available'
   }
 ];
 
@@ -104,6 +105,9 @@ export const AccountTopUp: React.FC<AccountTopUpProps> = () => {
   const [transactionSuccess, setTransactionSuccess] = useState(false);
   const [successfulAgentData, setSuccessfulAgentData] = useState<any>(null);
   const [transactionReference, setTransactionReference] = useState<string>('');
+  const [showShamCashQR, setShowShamCashQR] = useState(false);
+  const [shamCashQRCode, setShamCashQRCode] = useState<string>('');
+  const shamCashQRCanvasRef = useRef<HTMLCanvasElement>(null);
   
   // Get user's registered country
   const registeredCountry = profile?.country || 'Unknown';
@@ -240,6 +244,36 @@ export const AccountTopUp: React.FC<AccountTopUpProps> = () => {
     setAmount('');
   };
 
+  const generateShamCashQR = async () => {
+    try {
+      const shamCashData = `shamcash://transfer?amount=${amount}&currency=EUR&ref=${Date.now()}`;
+      await QRCode.toCanvas(shamCashQRCanvasRef.current, shamCashData, {
+        errorCorrectionLevel: 'H',
+        type: 'image/png',
+        quality: 0.95,
+        margin: 2,
+        width: 300,
+      });
+      setShamCashQRCode(shamCashData);
+    } catch (err) {
+      console.error('Error generating QR code:', err);
+    }
+  };
+
+  const handleShowShamCashQR = async () => {
+    setShowShamCashQR(true);
+    await generateShamCashQR();
+  };
+
+  const handleDownloadQRCode = () => {
+    if (shamCashQRCanvasRef.current) {
+      const link = document.createElement('a');
+      link.href = shamCashQRCanvasRef.current.toDataURL();
+      link.download = `sham-cash-transfer-${Date.now()}.png`;
+      link.click();
+    }
+  };
+
   // Auto-scroll to form when Western Union is selected
   useEffect(() => {
     if (selectedMethod === 'western-union' && westernUnionFormRef.current) {
@@ -374,6 +408,10 @@ export const AccountTopUp: React.FC<AccountTopUpProps> = () => {
         case 'agents':
           description = `Agent Network Top-up via ${agentName}`;
           recipient = agentName || t('topup.methodAgents');
+          break;
+        case 'sham-cash':
+          description = 'Sham Cash Digital Transfer';
+          recipient = 'Sham Cash';
           break;
         default:
           description = 'Account Top-up';
@@ -598,10 +636,26 @@ export const AccountTopUp: React.FC<AccountTopUpProps> = () => {
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center space-x-3">
                 <div className="p-3 bg-lime-accent/10 rounded-full">
-                  <method.icon className="w-6 h-6 text-lime-accent" />
+                  {method.id === 'sham-cash' ? (
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleShowShamCashQR();
+                      }}
+                      className="focus:outline-none"
+                    >
+                      <img src="https://shamcash.com/_next/static/media/logo.e8f94ee2.svg" alt="Sham Cash" className="w-6 h-6 cursor-pointer hover:opacity-80 transition-opacity" />
+                    </motion.button>
+                  ) : (
+                    <method.icon className="w-6 h-6 text-lime-accent" />
+                  )}
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-light-text dark:text-dark-text font-editorial">{t(method.name)}</h3>
+                  <h3 className="text-lg font-bold text-light-text dark:text-dark-text font-editorial">
+                    {method.id === 'sham-cash' ? 'Sham Cash' : t(method.name)}
+                  </h3>
                   <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(method.status)}`}>
                     {getStatusText(method.status)}
                   </span>
@@ -931,132 +985,110 @@ export const AccountTopUp: React.FC<AccountTopUpProps> = () => {
         </motion.div>
       )}
 
-      {/* Debit Card Form */}
-      {selectedMethod === 'debit-card' && (
+      {/* Sham Cash Form */}
+      {selectedMethod === 'sham-cash' && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
           className="bg-gradient-to-r from-light-surface/80 to-light-glass dark:from-dark-surface/80 dark:to-dark-glass border border-light-border dark:border-dark-border rounded-2xl p-6 shadow-glass transition-colors duration-300"
         >
-          <h3 className="text-xl font-bold text-light-text dark:text-dark-text font-editorial mb-4">{t('topup.debitCardPayment')}</h3>
-          
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-bold text-light-text dark:text-dark-text font-editorial">Sham Cash Transfer</h3>
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleShowShamCashQR}
+              className="focus:outline-none"
+            >
+              <img src="https://shamcash.com/_next/static/media/logo.e8f94ee2.svg" alt="Sham Cash" className="w-8 h-8 cursor-pointer hover:opacity-80 transition-opacity" />
+            </motion.button>
+          </div>
+
           <div className="space-y-6">
-            {/* Maintenance Notice */}
-            <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-xl p-4">
-              <div className="flex items-center space-x-3">
-                <AlertCircle className="w-6 h-6 text-orange-500" />
+            {/* Instructions */}
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
+              <p className="text-sm text-blue-700 dark:text-blue-300">
+                <strong>Transfer Instructions:</strong> Enter the amount below and tap the Sham Cash logo to generate a QR code for quick payment processing.
+              </p>
+            </div>
+
+            {/* Amount Input */}
+            <div>
+              <label className="block text-sm text-light-text-secondary dark:text-dark-text-secondary mb-2">Transfer Amount</label>
+              <div className="relative">
+                <input
+                  type="number"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="Enter amount (minimum 1 EUR)"
+                  min="1"
+                  max="50000"
+                  className="w-full bg-light-glass dark:bg-dark-glass border border-light-border dark:border-dark-border rounded-xl px-4 py-3 pr-12 text-light-text dark:text-dark-text focus:outline-none focus:border-lime-accent/50 transition-colors duration-300"
+                />
+                <span className="absolute right-4 top-1/2 transform -translate-y-1/2 text-light-text-secondary dark:text-dark-text-secondary">EUR</span>
+              </div>
+              <p className="text-xs text-light-text-secondary dark:text-dark-text-secondary mt-1">
+                Limit: 1 - 50,000 EUR
+              </p>
+            </div>
+
+            {/* Transfer Details */}
+            {amount && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                className="p-4 bg-lime-accent/10 border border-lime-accent/30 rounded-xl"
+              >
+                <div className="flex justify-between items-center text-sm mb-2">
+                  <span className="text-light-text-secondary dark:text-dark-text-secondary">Transfer Amount:</span>
+                  <span className="font-medium text-light-text dark:text-dark-text">{parseFloat(amount).toLocaleString()} EUR</span>
+                </div>
+                <div className="flex justify-between items-center text-sm mb-2">
+                  <span className="text-light-text-secondary dark:text-dark-text-secondary">Fee (1.5% + 1 EUR):</span>
+                  <span className="font-medium text-light-text dark:text-dark-text">
+                    {(parseFloat(amount) * 0.015 + 1).toLocaleString('en-US', { maximumFractionDigits: 2 })} EUR
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-sm pt-2 border-t border-lime-accent/20">
+                  <span className="font-medium text-light-text dark:text-dark-text">Total:</span>
+                  <span className="font-bold text-lime-accent">
+                    {(parseFloat(amount) + parseFloat(amount) * 0.015 + 1).toLocaleString('en-US', { maximumFractionDigits: 2 })} EUR
+                  </span>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Info Box */}
+            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-4">
+              <div className="flex items-start space-x-3">
+                <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="font-medium text-orange-800 dark:text-orange-200">{t('topup.serviceUnderMaintenance')}</h4>
-                  <p className="text-sm text-orange-600 dark:text-orange-300 mt-1">
-                    {t('topup.maintenanceMessage')}
+                  <h5 className="font-medium text-green-800 dark:text-green-200 mb-1">Fast & Secure</h5>
+                  <p className="text-sm text-green-700 dark:text-green-300">
+                    Tap the Sham Cash logo to generate a QR code and complete your transfer instantly.
                   </p>
                 </div>
               </div>
             </div>
-
-            {/* Card Form (Disabled) */}
-            <div className="opacity-50 pointer-events-none">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="md:col-span-2">
-                  <label className="block text-sm text-light-text-secondary dark:text-dark-text-secondary mb-2">{t('topup.cardNumber')}</label>
-                  <input
-                    type="text"
-                    placeholder="1234 5678 9012 3456"
-                    disabled
-                    className="w-full bg-light-glass dark:bg-dark-glass border border-light-border dark:border-dark-border rounded-xl px-4 py-3 text-light-text dark:text-dark-text focus:outline-none focus:border-lime-accent/50 transition-colors duration-300"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm text-light-text-secondary dark:text-dark-text-secondary mb-2">{t('topup.expiryDate')}</label>
-                  <input
-                    type="text"
-                    placeholder="MM/YY"
-                    disabled
-                    className="w-full bg-light-glass dark:bg-dark-glass border border-light-border dark:border-dark-border rounded-xl px-4 py-3 text-light-text dark:text-dark-text focus:outline-none focus:border-lime-accent/50 transition-colors duration-300"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm text-light-text-secondary dark:text-dark-text-secondary mb-2">{t('topup.securityCode')}</label>
-                  <input
-                    type="text"
-                    placeholder="123"
-                    disabled
-                    className="w-full bg-light-glass dark:bg-dark-glass border border-light-border dark:border-dark-border rounded-xl px-4 py-3 text-light-text dark:text-dark-text focus:outline-none focus:border-lime-accent/50 transition-colors duration-300"
-                  />
-                </div>
-                
-                <div className="md:col-span-2">
-                  <label className="block text-sm text-light-text-secondary dark:text-dark-text-secondary mb-2">{t('topup.cardholderName')}</label>
-                  <input
-                    type="text"
-                    placeholder={t('topup.cardholderNamePlaceholder')}
-                    disabled
-                    className="w-full bg-light-glass dark:bg-dark-glass border border-light-border dark:border-dark-border rounded-xl px-4 py-3 text-light-text dark:text-dark-text focus:outline-none focus:border-lime-accent/50 transition-colors duration-300"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm text-light-text-secondary dark:text-dark-text-secondary mb-2">{t('topup.amount')}</label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      placeholder={t('topup.enterAmount')}
-                      disabled
-                      className="w-full bg-light-glass dark:bg-dark-glass border border-light-border dark:border-dark-border rounded-xl px-4 py-3 pr-12 text-light-text dark:text-dark-text focus:outline-none focus:border-lime-accent/50 transition-colors duration-300"
-                    />
-                    <span className="absolute right-4 top-1/2 transform -translate-y-1/2 text-light-text-secondary dark:text-dark-text-secondary">EUR</span>
-                  </div>
-                </div>
-                
-                <div>
-                  <label className="block text-sm text-light-text-secondary dark:text-dark-text-secondary mb-2">{t('topup.currency')}</label>
-                  <select
-                    disabled
-                    className="w-full bg-white dark:bg-gray-800 border border-light-border dark:border-dark-border rounded-xl px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:border-lime-accent/50 transition-colors duration-300 opacity-75"
-                  >
-                    <option value="EUR" className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white">{t('topup.eur')}</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Alternative Payment Methods */}
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
-              <h5 className="font-medium text-blue-800 dark:text-blue-200 mb-3">{t('topup.alternativePaymentMethods')}</h5>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => setSelectedMethod('western-union')}
-                  className="flex items-center space-x-2 p-3 bg-white dark:bg-dark-surface border border-blue-200 dark:border-blue-700 rounded-lg hover:border-lime-accent/50 transition-colors text-sm"
-                >
-                  <Wallet className="w-4 h-4 text-lime-accent" />
-                  <span className="text-light-text dark:text-dark-text">{t('topup.methodWesternUnion')}</span>
-                </motion.button>
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => setSelectedMethod('agents')}
-                  className="flex items-center space-x-2 p-3 bg-white dark:bg-dark-surface border border-blue-200 dark:border-blue-700 rounded-lg hover:border-lime-accent/50 transition-colors text-sm"
-                >
-                  <Users className="w-4 h-4 text-lime-accent" />
-                  <span className="text-light-text dark:text-dark-text">{t('topup.methodAgents')}</span>
-                </motion.button>
-              </div>
-            </div>
           </div>
-          
+
           <div className="flex justify-end mt-6">
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              disabled
-              className="bg-gray-400 text-white px-6 py-3 rounded-xl font-medium cursor-not-allowed opacity-50"
+              onClick={() => handleTopUpSubmit('sham-cash', `SC${Date.now().toString().slice(-8)}`)}
+              disabled={isProcessing || !amount || parseFloat(amount) < 1}
+              className="bg-lime-accent text-light-base dark:text-dark-base px-6 py-3 rounded-xl font-medium hover:shadow-glow transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
             >
-              {t('topup.notAvailable')}
+              {isProcessing ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-light-base dark:border-dark-base border-t-transparent rounded-full animate-spin" />
+                  <span>Processing...</span>
+                </>
+              ) : (
+                <span>Proceed with Sham Cash</span>
+              )}
             </motion.button>
           </div>
         </motion.div>
@@ -1402,6 +1434,82 @@ export const AccountTopUp: React.FC<AccountTopUpProps> = () => {
               </div>
             </motion.div>
           )}
+        </motion.div>
+      )}
+
+      {/* Sham Cash QR Modal */}
+      {showShamCashQR && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          onClick={() => setShowShamCashQR(false)}
+        >
+          <motion.div
+            initial={{ y: 50 }}
+            animate={{ y: 0 }}
+            onClick={(e) => e.stopPropagation()}
+            className="bg-light-surface dark:bg-dark-surface rounded-2xl shadow-2xl max-w-md w-full p-8 border border-light-border dark:border-dark-border"
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-2xl font-bold text-light-text dark:text-dark-text">Sham Cash QR Code</h3>
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setShowShamCashQR(false)}
+                className="p-2 hover:bg-light-glass dark:hover:bg-dark-glass rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-light-text-secondary dark:text-dark-text-secondary" />
+              </motion.button>
+            </div>
+
+            <div className="space-y-6">
+              {/* QR Code */}
+              <div className="flex justify-center">
+                <canvas
+                  ref={shamCashQRCanvasRef}
+                  className="w-72 h-72 bg-white dark:bg-white rounded-xl p-4"
+                />
+              </div>
+
+              {/* Amount Display */}
+              {amount && (
+                <div className="text-center p-4 bg-lime-accent/10 border border-lime-accent/30 rounded-xl">
+                  <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary mb-1">Transfer Amount</p>
+                  <p className="text-2xl font-bold text-lime-accent">
+                    {parseFloat(amount).toLocaleString()} EUR
+                  </p>
+                </div>
+              )}
+
+              {/* Instructions */}
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-3">
+                <p className="text-sm text-blue-700 dark:text-blue-300">
+                  Scan this QR code with your Sham Cash app to complete the transfer.
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="grid grid-cols-2 gap-3">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleDownloadQRCode}
+                  className="bg-lime-accent text-light-base dark:text-dark-base px-4 py-3 rounded-lg font-medium hover:shadow-glow transition-all"
+                >
+                  Download
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setShowShamCashQR(false)}
+                  className="bg-light-glass dark:bg-dark-glass border border-light-border dark:border-dark-border text-light-text dark:text-dark-text px-4 py-3 rounded-lg font-medium hover:bg-light-border dark:hover:bg-dark-border transition-all"
+                >
+                  Close
+                </motion.button>
+              </div>
+            </div>
+          </motion.div>
         </motion.div>
       )}
 
