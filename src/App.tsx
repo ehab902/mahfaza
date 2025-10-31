@@ -261,17 +261,26 @@ const AppContent: React.FC<{
                   />
                 </div>
               )}
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={activeSection}
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.3, ease: "easeInOut" }}
-                >
-                  {renderMainContent(submission)}
-                </motion.div>
-              </AnimatePresence>
+              {loading ? (
+                <div className="flex items-center justify-center h-96">
+                  <div className="text-center">
+                    <div className="w-16 h-16 border-4 border-lime-accent border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                    <p className="text-light-text dark:text-dark-text">جاري التحميل...</p>
+                  </div>
+                </div>
+              ) : (
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={activeSection}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                  >
+                    {renderMainContent(submission)}
+                  </motion.div>
+                </AnimatePresence>
+              )}
             </div>
             <Footer />
           </div>
