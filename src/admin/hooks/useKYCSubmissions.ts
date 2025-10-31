@@ -107,6 +107,40 @@ export function useKYCSubmissions() {
         updated_at: serverTimestamp(),
       });
 
+      // Update bank account status to Active when KYC is approved
+      if (status === 'approved' && oldSubmission?.user_id) {
+        const bankAccountQuery = query(
+          collection(db, 'bank_accounts'),
+          where('user_id', '==', oldSubmission.user_id)
+        );
+        const bankAccountSnapshot = await getDocs(bankAccountQuery);
+
+        if (!bankAccountSnapshot.empty) {
+          const bankAccountRef = doc(db, 'bank_accounts', bankAccountSnapshot.docs[0].id);
+          await updateDoc(bankAccountRef, {
+            status: 'Active',
+            updated_at: serverTimestamp(),
+          });
+        }
+      }
+
+      // Update bank account status to Suspended when KYC is rejected
+      if (status === 'rejected' && oldSubmission?.user_id) {
+        const bankAccountQuery = query(
+          collection(db, 'bank_accounts'),
+          where('user_id', '==', oldSubmission.user_id)
+        );
+        const bankAccountSnapshot = await getDocs(bankAccountQuery);
+
+        if (!bankAccountSnapshot.empty) {
+          const bankAccountRef = doc(db, 'bank_accounts', bankAccountSnapshot.docs[0].id);
+          await updateDoc(bankAccountRef, {
+            status: 'Suspended',
+            updated_at: serverTimestamp(),
+          });
+        }
+      }
+
       const auditRef = doc(collection(db, 'kyc_audit_log'));
       await setDoc(auditRef, {
         submission_id: submissionId,
