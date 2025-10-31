@@ -1,22 +1,20 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   X,
-  Upload,
   Check,
   AlertTriangle,
   FileText,
-  Image as ImageIcon,
-  Loader
+  Loader,
+  XCircle
 } from 'lucide-react';
-import { db, storage } from '../../firebase';
+import { db } from '../../firebase';
 import {
   collection,
   doc,
   setDoc,
   serverTimestamp
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { UnverifiedAccount } from '../hooks/useUnverifiedAccounts';
 
 interface ManualKYCReviewModalProps {
@@ -27,12 +25,6 @@ interface ManualKYCReviewModalProps {
   adminEmail: string;
 }
 
-interface DocumentPreview {
-  type: 'national_id' | 'passport' | 'selfie';
-  file: File | null;
-  preview: string | null;
-}
-
 export function ManualKYCReviewModal({
   account,
   onClose,
@@ -40,148 +32,93 @@ export function ManualKYCReviewModal({
   adminId,
   adminEmail
 }: ManualKYCReviewModalProps) {
-  const [documents, setDocuments] = useState<Record<string, DocumentPreview>>({
-    national_id: { type: 'national_id', file: null, preview: null },
-    passport: { type: 'passport', file: null, preview: null },
-    selfie: { type: 'selfie', file: null, preview: null }
-  });
-
   const [notes, setNotes] = useState('');
   const [source, setSource] = useState('whatsapp');
-  const [uploading, setUploading] = useState(false);
+  const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const [success, setSuccess] = useState<string | null>(null);
 
-  const fileInputRefs = {
-    national_id: useRef<HTMLInputElement>(null),
-    passport: useRef<HTMLInputElement>(null),
-    selfie: useRef<HTMLInputElement>(null)
-  };
-
-  const handleFileSelect = (type: 'national_id' | 'passport' | 'selfie', file: File): void => {
-    if (!file.type.startsWith('image/')) {
-      setError('يجب اختيار ملف صورة');
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      setError('حجم الملف لا يجب أن يتجاوز 5 MB');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      setDocuments(prev => ({
-        ...prev,
-        [type]: {
-          ...prev[type],
-          file,
-          preview: e.target?.result as string
-        }
-      }));
-    };
-    reader.readAsDataURL(file);
-    setError(null);
-  };
-
-  const uploadDocument = async (
-    type: 'national_id' | 'passport' | 'selfie',
-    file: File
-  ): Promise<string | null> => {
-    try {
-      const fileName = `kyc-documents/${account.user_id}/${type}-${Date.now()}`;
-      const storageRef = ref(storage, fileName);
-      await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(storageRef);
-      return downloadURL;
-    } catch (err) {
-      console.error(`Error uploading ${type}:`, err);
-      throw err;
-    }
-  };
-
-  const handleSubmit = async () => {
+  const handleApprove = async () => {
     try {
       setError(null);
-      setUploading(true);
+      setProcessing(true);
 
-      // Validate at least one document is selected
-      const hasDocuments = Object.values(documents).some(doc => doc.file !== null);
-      if (!hasDocuments) {
-        setError('يجب رفع واحد على الأقل من المستندات');
-        setUploading(false);
-        return;
-      }
-
-      // Upload documents to Firebase Storage
-      const uploadedUrls: Record<string, string | null> = {
-        national_id_url: null,
-        passport_url: null,
-        selfie_url: null
-      };
-
-      for (const [key, doc] of Object.entries(documents)) {
-        if (doc.file) {
-          const url = await uploadDocument(key as 'national_id' | 'passport' | 'selfie', doc.file);
-          uploadedUrls[`${key}_url`] = url;
-        }
-      }
-
-      // Create KYC submission
-      const submissionRef = doc(collection(db, 'kyc_submissions'));
-      await setDoc(submissionRef, {
-        user_id: account.user_id,
-        national_id_url: uploadedUrls.national_id_url,
-        passport_url: uploadedUrls.passport_url,
-        selfie_url: uploadedUrls.selfie_url,
-        status: 'under_review',
-        admin_notes: notes || null,
-        reviewed_by: adminId,
-        reviewed_at: serverTimestamp(),
-        rejection_reason: null,
-        submission_date: serverTimestamp(),
-        created_at: serverTimestamp(),
-        updated_at: serverTimestamp(),
-        manual_submission: true,
-        submission_source: source,
-        submitted_by_admin: adminEmail
-      });
-
-      // Create audit log entry
       const auditRef = doc(collection(db, 'kyc_audit_log'));
       await setDoc(auditRef, {
-        submission_id: submissionRef.id,
+        user_id: account.user_id,
         admin_id: adminId,
         admin_email: adminEmail,
-        action: 'manual_submission_created',
+        action: 'manual_verification_approved',
         old_status: null,
-        new_status: 'under_review',
-        notes: `تم إنشاء طلب KYC يدوياً من المصدر: ${source}. ${notes}`,
+        new_status: 'verified',
+        notes: `تم قبول التحقق يدوياً من المصدر: ${source}. ${notes}`,
         ip_address: null,
         created_at: serverTimestamp()
       });
 
-      // Create notification for user
       const notificationRef = doc(collection(db, 'kyc_notifications'));
       await setDoc(notificationRef, {
         user_id: account.user_id,
-        submission_id: submissionRef.id,
-        type: 'under_review',
-        title: 'تم استلام طلب التحقق',
-        message: 'تم استلام مستنداتك قيد المراجعة. سنرسل لك إشعاراً عند اكتمال المراجعة.',
+        type: 'approved',
+        title: 'تم قبول التحقق من الهوية',
+        message: 'تم قبول طلب التحقق من الهوية بنجاح. يمكنك الآن الوصول إلى جميع المميزات.',
         is_read: false,
         created_at: serverTimestamp()
       });
 
-      setSuccess(true);
+      setSuccess('تم قبول الحساب بنجاح');
       setTimeout(() => {
         onSuccess();
         onClose();
       }, 2000);
     } catch (err) {
-      console.error('Error creating manual KYC submission:', err);
-      setError('فشل في إنشاء طلب التحقق. يرجى المحاولة مرة أخرى.');
-      setUploading(false);
+      console.error('Error approving manual verification:', err);
+      setError('فشل في قبول الحساب. يرجى المحاولة مرة أخرى.');
+      setProcessing(false);
+    }
+  };
+
+  const handleReject = async () => {
+    try {
+      setError(null);
+      if (!notes.trim()) {
+        setError('يجب إدخال سبب الرفض في الملاحظات');
+        return;
+      }
+      setProcessing(true);
+
+      const auditRef = doc(collection(db, 'kyc_audit_log'));
+      await setDoc(auditRef, {
+        user_id: account.user_id,
+        admin_id: adminId,
+        admin_email: adminEmail,
+        action: 'manual_verification_rejected',
+        old_status: null,
+        new_status: 'rejected',
+        notes: `تم رفض التحقق يدوياً من المصدر: ${source}. السبب: ${notes}`,
+        ip_address: null,
+        created_at: serverTimestamp()
+      });
+
+      const notificationRef = doc(collection(db, 'kyc_notifications'));
+      await setDoc(notificationRef, {
+        user_id: account.user_id,
+        type: 'rejected',
+        title: 'تم رفض طلب التحقق من الهوية',
+        message: `تم رفض طلب التحقق من الهوية. السبب: ${notes}`,
+        is_read: false,
+        created_at: serverTimestamp()
+      });
+
+      setSuccess('تم رفض الحساب');
+      setTimeout(() => {
+        onSuccess();
+        onClose();
+      }, 2000);
+    } catch (err) {
+      console.error('Error rejecting manual verification:', err);
+      setError('فشل في رفض الحساب. يرجى المحاولة مرة أخرى.');
+      setProcessing(false);
     }
   };
 
@@ -214,7 +151,7 @@ export function ManualKYCReviewModal({
                 تم بنجاح
               </h3>
               <p className="text-light-text-secondary dark:text-dark-text-secondary">
-                تم إنشاء طلب التحقق بنجاح
+                {success}
               </p>
             </motion.div>
           </div>
@@ -231,7 +168,8 @@ export function ManualKYCReviewModal({
               </div>
               <button
                 onClick={onClose}
-                className="p-2 hover:bg-light-base dark:hover:bg-dark-base rounded-full transition-colors"
+                disabled={processing}
+                className="p-2 hover:bg-light-base dark:hover:bg-dark-base rounded-full transition-colors disabled:opacity-50"
               >
                 <X className="w-6 h-6 text-light-text dark:text-dark-text" />
               </button>
@@ -268,12 +206,13 @@ export function ManualKYCReviewModal({
 
               <div>
                 <label className="block text-sm font-semibold text-light-text dark:text-dark-text mb-3">
-                  مصدر المستندات
+                  مصدر التحقق
                 </label>
                 <select
                   value={source}
                   onChange={(e) => setSource(e.target.value)}
-                  className="w-full px-4 py-3 bg-light-base dark:bg-dark-base border border-light-border dark:border-dark-border rounded-xl text-light-text dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-lime-accent appearance-none cursor-pointer"
+                  disabled={processing}
+                  className="w-full px-4 py-3 bg-light-base dark:bg-dark-base border border-light-border dark:border-dark-border rounded-xl text-light-text dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-lime-accent appearance-none cursor-pointer disabled:opacity-50"
                 >
                   <option value="whatsapp">واتساب</option>
                   <option value="email">بريد إلكتروني</option>
@@ -285,104 +224,57 @@ export function ManualKYCReviewModal({
 
               <div>
                 <label className="block text-sm font-semibold text-light-text dark:text-dark-text mb-3">
-                  المستندات المطلوبة
-                </label>
-                <div className="space-y-4">
-                  {Object.entries(documents).map(([key, doc]) => (
-                    <div key={key}>
-                      <div className="flex items-center justify-between mb-2">
-                        <label className="text-sm text-light-text-secondary dark:text-dark-text-secondary">
-                          {key === 'national_id' && 'الهوية الوطنية (اختياري)'}
-                          {key === 'passport' && 'جواز السفر (اختياري)'}
-                          {key === 'selfie' && 'صورة شخصية (اختياري)'}
-                        </label>
-                        {doc.file && (
-                          <span className="text-xs text-green-600 dark:text-green-400 font-medium">
-                            تم الرفع
-                          </span>
-                        )}
-                      </div>
-
-                      <input
-                        ref={fileInputRefs[key as keyof typeof fileInputRefs]}
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleFileSelect(key as 'national_id' | 'passport' | 'selfie', file);
-                        }}
-                        className="hidden"
-                      />
-
-                      {doc.preview ? (
-                        <div className="relative group">
-                          <img
-                            src={doc.preview}
-                            alt={key}
-                            className="w-full h-48 object-cover rounded-xl border border-light-border dark:border-dark-border"
-                          />
-                          <button
-                            onClick={() =>
-                              fileInputRefs[key as keyof typeof fileInputRefs]?.current?.click()
-                            }
-                            className="absolute inset-0 bg-black/50 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                          >
-                            <Upload className="w-6 h-6 text-white" />
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() =>
-                            fileInputRefs[key as keyof typeof fileInputRefs]?.current?.click()
-                          }
-                          className="w-full border-2 border-dashed border-light-border dark:border-dark-border rounded-xl p-6 hover:border-lime-accent transition-colors flex flex-col items-center justify-center gap-2 hover:bg-light-base dark:hover:bg-dark-base"
-                        >
-                          <ImageIcon className="w-8 h-8 text-light-text-secondary dark:text-dark-text-secondary" />
-                          <span className="text-sm text-light-text-secondary dark:text-dark-text-secondary">
-                            اضغط لاختيار صورة
-                          </span>
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-light-text dark:text-dark-text mb-3">
-                  ملاحظات إضافية
+                  ملاحظات
                 </label>
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="أضف أي ملاحظات حول المستندات أو عملية التحقق..."
+                  placeholder="أضف ملاحظاتك حول هذا التحقق..."
                   rows={4}
-                  className="w-full px-4 py-3 bg-light-base dark:bg-dark-base border border-light-border dark:border-dark-border rounded-xl text-light-text dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-lime-accent resize-none"
+                  disabled={processing}
+                  className="w-full px-4 py-3 bg-light-base dark:bg-dark-base border border-light-border dark:border-dark-border rounded-xl text-light-text dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-lime-accent resize-none disabled:opacity-50"
                 />
               </div>
 
               <div className="flex gap-3 pt-4 border-t border-light-border dark:border-dark-border">
                 <button
                   onClick={onClose}
-                  disabled={uploading}
+                  disabled={processing}
                   className="flex-1 px-6 py-3 bg-light-glass dark:bg-dark-glass border border-light-border dark:border-dark-border text-light-text dark:text-dark-text rounded-xl font-medium hover:bg-light-border dark:hover:bg-dark-border transition-colors disabled:opacity-50"
                 >
-                  إلغاء
+                  إغلاق
                 </button>
                 <button
-                  onClick={handleSubmit}
-                  disabled={uploading}
-                  className="flex-1 px-6 py-3 bg-gradient-to-r from-lime-accent to-lime-500 text-dark-text rounded-xl font-medium hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+                  onClick={handleReject}
+                  disabled={processing}
+                  className="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  {uploading ? (
+                  {processing ? (
                     <>
                       <Loader className="w-4 h-4 animate-spin" />
-                      جاري الرفع...
+                      جاري المعالجة...
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="w-4 h-4" />
+                      رفض
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={handleApprove}
+                  disabled={processing}
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-lime-accent to-lime-500 text-dark-text rounded-xl font-medium hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {processing ? (
+                    <>
+                      <Loader className="w-4 h-4 animate-spin" />
+                      جاري المعالجة...
                     </>
                   ) : (
                     <>
                       <Check className="w-4 h-4" />
-                      إنشاء طلب التحقق
+                      قبول
                     </>
                   )}
                 </button>
