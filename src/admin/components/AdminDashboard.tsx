@@ -40,12 +40,13 @@ import { useAgentsManagement } from '../../agents/hooks/useAgentsManagement';
 import { AddAgentModal } from '../../agents/components/AddAgentModal';
 import { EditAgentModal } from '../../agents/components/EditAgentModal';
 import { useAgentTransactionsAdmin } from '../hooks/useAgentTransactions';
+import { UnverifiedAccounts } from './UnverifiedAccounts';
 
 interface AdminDashboardProps {
   user: User;
 }
 
-type TabType = 'kyc' | 'topups' | 'agents' | 'agent-transactions';
+type TabType = 'kyc' | 'topups' | 'agents' | 'agent-transactions' | 'unverified';
 
 export function AdminDashboard({ user }: AdminDashboardProps) {
   const { submissions: kycSubmissions, loading: kycLoading, stats: kycStats, updateSubmissionStatus: updateKYCStatus } = useKYCSubmissions();
@@ -126,9 +127,9 @@ export function AdminDashboard({ user }: AdminDashboardProps) {
     setCancellationReason('');
   };
 
-  const currentSubmissions = activeTab === 'agents' ? [] : activeTab === 'agent-transactions' ? agentTransactions : (activeTab === 'kyc' ? kycSubmissions : topUpSubmissions);
-  const currentStats = activeTab === 'agents' ? { total: 0, pending: 0, approved: 0, rejected: 0 } : activeTab === 'agent-transactions' ? agentTransactionsStats : (activeTab === 'kyc' ? kycStats : topUpStats);
-  const currentLoading = activeTab === 'agents' ? agentsLoading : activeTab === 'agent-transactions' ? agentTransactionsLoading : (activeTab === 'kyc' ? kycLoading : topUpLoading);
+  const currentSubmissions = activeTab === 'agents' || activeTab === 'unverified' ? [] : activeTab === 'agent-transactions' ? agentTransactions : (activeTab === 'kyc' ? kycSubmissions : topUpSubmissions);
+  const currentStats = activeTab === 'agents' || activeTab === 'unverified' ? { total: 0, pending: 0, approved: 0, rejected: 0 } : activeTab === 'agent-transactions' ? agentTransactionsStats : (activeTab === 'kyc' ? kycStats : topUpStats);
+  const currentLoading = activeTab === 'agents' || activeTab === 'unverified' ? agentsLoading : activeTab === 'agent-transactions' ? agentTransactionsLoading : (activeTab === 'kyc' ? kycLoading : topUpLoading);
 
   const filteredSubmissions = currentSubmissions.filter((submission: any) => {
     const matchesFilter = filterStatus === 'all' || submission.status === filterStatus;
@@ -410,6 +411,22 @@ export function AdminDashboard({ user }: AdminDashboardProps) {
                 <Wallet className="w-5 h-5" />
                 معاملات الوكلاء
               </button>
+              <button
+                onClick={() => {
+                  setActiveTab('unverified');
+                  setFilterStatus('all');
+                  setSearchQuery('');
+                  setFilterCountry('all');
+                }}
+                className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-medium transition-all whitespace-nowrap ${
+                  activeTab === 'unverified'
+                    ? 'bg-lime-accent text-dark-text shadow-lg'
+                    : 'bg-light-surface dark:bg-dark-surface text-light-text dark:text-dark-text border border-light-border dark:border-dark-border hover:border-lime-accent/50'
+                }`}
+              >
+                <AlertTriangle className="w-5 h-5" />
+                حسابات غير محققة
+              </button>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -493,7 +510,9 @@ export function AdminDashboard({ user }: AdminDashboardProps) {
             </div>
           </div>
 
-          {activeTab === 'agents' ? (
+          {activeTab === 'unverified' ? (
+            <UnverifiedAccounts adminId={user.uid} adminEmail={user.email || ''} />
+          ) : activeTab === 'agents' ? (
             <>
               {agentsLoading ? (
                 <div className="p-12 text-center">
