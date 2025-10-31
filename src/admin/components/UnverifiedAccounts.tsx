@@ -286,8 +286,17 @@ export function UnverifiedAccounts({ adminId, adminEmail }: UnverifiedAccountsPr
       {selectedAccount && (
         <ManualKYCReviewModal
           account={selectedAccount}
-          onClose={() => setSelectedAccount(null)}
-          onSuccess={refresh}
+          onClose={() => {
+            setSelectedAccount(null);
+            setTimeout(() => {
+              refresh();
+            }, 500);
+          }}
+          onSuccess={() => {
+            setTimeout(() => {
+              refresh();
+            }, 500);
+          }}
           adminId={adminId}
           adminEmail={adminEmail}
         />

@@ -167,8 +167,10 @@ export function ManualKYCReviewModal({
 
       setSuccess(true);
       setTimeout(() => {
-        onSuccess();
         onClose();
+        setTimeout(() => {
+          onSuccess();
+        }, 100);
       }, 2000);
     } catch (err) {
       console.error('Error creating manual KYC submission:', err);
