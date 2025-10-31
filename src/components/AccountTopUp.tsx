@@ -16,8 +16,7 @@ interface AccountTopUpProps {}
 interface TopUpMethod {
   id: string;
   name: string;
-  icon?: React.ElementType;
-  logoUrl?: string;
+  icon: React.ElementType;
   description: string;
   processingTime: string;
   fees: string;
@@ -61,15 +60,15 @@ const topUpMethods: TopUpMethod[] = [
     status: 'available'
   },
   {
-    id: 'sham-cash',
-    name: 'Sham Cash',
-    logoUrl: 'https://shamcash.com/_next/static/media/logo.e8f94ee2.svg',
+    id: 'debit-card',
+    name: 'topup.methodDebitCard',
+    icon: CreditCard,
     description: 'topup.descDebitCard',
     processingTime: 'topup.processingTimeInstant',
     fees: '2% + 1.5 EUR',
     minAmount: 25,
     maxAmount: 10000,
-    status: 'available'
+    status: 'maintenance'
   }
 ];
 
@@ -105,7 +104,6 @@ export const AccountTopUp: React.FC<AccountTopUpProps> = () => {
   const [transactionSuccess, setTransactionSuccess] = useState(false);
   const [successfulAgentData, setSuccessfulAgentData] = useState<any>(null);
   const [transactionReference, setTransactionReference] = useState<string>('');
-  const [showShamCashQR, setShowShamCashQR] = useState(false);
   
   // Get user's registered country
   const registeredCountry = profile?.country || 'Unknown';
@@ -600,14 +598,10 @@ export const AccountTopUp: React.FC<AccountTopUpProps> = () => {
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center space-x-3">
                 <div className="p-3 bg-lime-accent/10 rounded-full">
-                  {method.logoUrl ? (
-                    <img src={method.logoUrl} alt={method.name} className="w-6 h-6 object-contain" />
-                  ) : method.icon ? (
-                    <method.icon className="w-6 h-6 text-lime-accent" />
-                  ) : null}
+                  <method.icon className="w-6 h-6 text-lime-accent" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-light-text dark:text-dark-text font-editorial">{method.name}</h3>
+                  <h3 className="text-lg font-bold text-light-text dark:text-dark-text font-editorial">{t(method.name)}</h3>
                   <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(method.status)}`}>
                     {getStatusText(method.status)}
                   </span>
@@ -933,139 +927,6 @@ export const AccountTopUp: React.FC<AccountTopUpProps> = () => {
                 <span>{t('topup.confirmTransfer')}</span>
               )}
             </motion.button>
-          </div>
-        </motion.div>
-      )}
-
-      {/* Sham Cash Form */}
-      {selectedMethod === 'sham-cash' && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="bg-gradient-to-r from-light-surface/80 to-light-glass dark:from-dark-surface/80 dark:to-dark-glass border border-light-border dark:border-dark-border rounded-2xl p-6 shadow-glass transition-colors duration-300"
-        >
-          <h3 className="text-xl font-bold text-light-text dark:text-dark-text font-editorial mb-4">Sham Cash</h3>
-
-          <div className="space-y-6">
-            {/* Logo and Description */}
-            <div className="flex items-center space-x-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl">
-              <img src="https://shamcash.com/_next/static/media/logo.e8f94ee2.svg" alt="Sham Cash" className="w-16 h-16 object-contain" />
-              <div>
-                <h4 className="font-medium text-light-text dark:text-dark-text mb-1">Sham Cash</h4>
-                <p className="text-sm text-blue-700 dark:text-blue-300">
-                  تعبئة حسابك بسهولة عبر Sham Cash
-                </p>
-              </div>
-            </div>
-
-            {/* Amount Input */}
-            <div>
-              <label className="block text-sm text-light-text-secondary dark:text-dark-text-secondary mb-2">{t('topup.amount')}</label>
-              <div className="relative">
-                <input
-                  type="number"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder={t('topup.enterAmount')}
-                  min="25"
-                  max="10000"
-                  className="w-full bg-light-glass dark:bg-dark-glass border border-light-border dark:border-dark-border rounded-xl px-4 py-3 pr-12 text-light-text dark:text-dark-text focus:outline-none focus:border-lime-accent/50 transition-colors duration-300"
-                />
-                <span className="absolute right-4 top-1/2 transform -translate-y-1/2 text-light-text-secondary dark:text-dark-text-secondary">EUR</span>
-              </div>
-              <p className="text-xs text-light-text-secondary dark:text-dark-text-secondary mt-1">
-                الحد الأدنى: 25 EUR - الحد الأقصى: 10,000 EUR
-              </p>
-            </div>
-
-            {/* QR Code Button */}
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setShowShamCashQR(!showShamCashQR)}
-              disabled={!amount || parseFloat(amount) < 25 || parseFloat(amount) > 10000}
-              className="w-full bg-lime-accent text-light-base dark:text-dark-base px-6 py-4 rounded-xl font-medium hover:shadow-glow transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
-            >
-              <span>{showShamCashQR ? 'إخفاء الباركود' : 'عرض الباركود للتحويل'}</span>
-              <ArrowRight className="w-5 h-5" />
-            </motion.button>
-
-            {/* QR Code Display */}
-            {showShamCashQR && amount && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="p-6 bg-white dark:bg-gray-800 rounded-xl border border-light-border dark:border-dark-border text-center"
-              >
-                <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary mb-4">
-                  امسح الباركود أسفله للتحويل عبر Sham Cash
-                </p>
-
-                {/* QR Code Placeholder - You can replace with actual QR code library */}
-                <div className="flex justify-center mb-6">
-                  <div className="w-64 h-64 bg-gradient-to-br from-lime-accent/20 to-lime-accent/10 rounded-xl border-2 border-dashed border-lime-accent/30 flex items-center justify-center">
-                    <div className="text-center">
-                      <div className="text-4xl mb-2">📱</div>
-                      <p className="text-sm text-light-text-secondary dark:text-dark-text-secondary">
-                        قم بمسح الكود
-                      </p>
-                      <p className="text-xs text-light-text-secondary dark:text-dark-text-secondary mt-1">
-                        المبلغ: {parseFloat(amount).toLocaleString()} EUR
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Transfer Details */}
-                <div className="space-y-3 text-left">
-                  <div className="flex justify-between p-3 bg-light-glass dark:bg-dark-glass rounded-lg">
-                    <span className="text-light-text-secondary dark:text-dark-text-secondary">المبلغ:</span>
-                    <span className="font-medium text-light-text dark:text-dark-text">{parseFloat(amount).toLocaleString()} EUR</span>
-                  </div>
-                  <div className="flex justify-between p-3 bg-light-glass dark:bg-dark-glass rounded-lg">
-                    <span className="text-light-text-secondary dark:text-dark-text-secondary">الرسوم:</span>
-                    <span className="font-medium text-light-text dark:text-dark-text">{((parseFloat(amount) * 2) / 100 + 1.5).toFixed(2)} EUR</span>
-                  </div>
-                  <div className="flex justify-between p-3 bg-lime-accent/10 border border-lime-accent/30 rounded-lg">
-                    <span className="text-light-text dark:text-dark-text font-medium">الإجمالي:</span>
-                    <span className="font-bold text-lime-accent">{(parseFloat(amount) + ((parseFloat(amount) * 2) / 100 + 1.5)).toFixed(2)} EUR</span>
-                  </div>
-                </div>
-
-                {/* Instructions */}
-                <div className="mt-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl text-left">
-                  <h5 className="font-medium text-yellow-800 dark:text-yellow-200 mb-2">خطوات التحويل:</h5>
-                  <ol className="text-sm text-yellow-700 dark:text-yellow-300 space-y-1 list-decimal list-inside">
-                    <li>افتح تطبيق Sham Cash</li>
-                    <li>اختر خيار التحويل للآخرين</li>
-                    <li>امسح الباركود أعلاه</li>
-                    <li>تابع عملية التحويل</li>
-                  </ol>
-                </div>
-              </motion.div>
-            )}
-
-            {/* Support Info */}
-            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-green-800 dark:text-green-200">هل تحتاج إلى مساعدة؟</p>
-                  <p className="text-xs text-green-700 dark:text-green-300 mt-1">تواصل مع فريق الدعم الفني</p>
-                </div>
-                <motion.a
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  href="https://wa.me/message/support"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center space-x-2 bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors text-sm"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  <span>WhatsApp</span>
-                </motion.a>
-              </div>
-            </div>
           </div>
         </motion.div>
       )}
